@@ -18,20 +18,10 @@
         android:layout_alignParentLeft="true"
         android:onClick="onRequest" />
 
-    <ScrollView
+    <WebView
         android:layout_width="match_parent"
         android:layout_height="fill_parent"
-        android:id="@+id/scrollView"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentLeft="true"
-        android:layout_above="@+id/button">
+        android:id="@+id/webView"
+        android:layout_above="@+id/button" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="fill_parent"
-            android:layout_alignParentTop="true"
-            android:layout_alignParentLeft="true"
-            android:layout_above="@+id/button"
-            android:id="@+id/contentTextView" />
-    </ScrollView>
 </RelativeLayout>
