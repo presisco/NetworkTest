@@ -1,9 +1,9 @@
 package com.presisco.example.networktest;
 
 import android.os.AsyncTask;
-import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Pair;
 import android.util.Xml;
 import android.view.View;
@@ -18,22 +18,32 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Reader;
+import java.io.OutputStream;
+import java.net.CookieHandler;
+import java.net.CookieManager;
+import java.net.HttpCookie;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
-import java.nio.ByteOrder;
-import java.nio.CharBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
+    public static final String root_url = "http://yuyue.juneberry.cn";
     WebView mContentWeb=null;
+    TextView mContentText=null;
+    CookieManager loginCookieManager;
+
+    public String event_validation="";
+    public String view_state="";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mContentWeb=(WebView)findViewById(R.id.webView);
+        //mContentWeb=(WebView)findViewById(R.id.webView);
+        mContentText=(TextView)findViewById(R.id.textView);
     }
 
     public void onRequest(View v){
@@ -41,77 +51,125 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class NetwortTask extends AsyncTask<Void,Void,String>{
-        LoginXmlPullParser loginXmlPullParser;
+        LoginParamsXmlPullParser loginXmlPullParser;
 
         @Override
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
-            mContentWeb.loadData(result,"text/html",null);
+            mContentText.setText(result);
+            //mContentWeb.loadData(result,"text/html",null);
         }
 
         @Override
         protected String doInBackground(Void... params) {
             String result="";
             try {
-                //get necessary params
-                URL url = new URL("http://yuyue.juneberry.cn/");
-                HttpURLConnection conn=(HttpURLConnection)url.openConnection();
-                conn.setReadTimeout(10000);
-                conn.setConnectTimeout(10000);
-                conn.setRequestMethod("GET");
-                conn.setDoInput(true);
-                conn.connect();
-                InputStream is=conn.getInputStream();
-                loginXmlPullParser =new LoginXmlPullParser();
-                loginXmlPullParser.parse(is, new String[]{"html", "body", "form"}, "input");
-                is.close();
-                conn.disconnect();
-
-                //login
-                conn=(HttpURLConnection)url.openConnection();
-                conn.setReadTimeout(10000);
-                conn.setConnectTimeout(10000);
-                conn.setRequestMethod("POST");
-                conn.setDoInput(true);
-                conn.setDoOutput(true);
-                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                conn.connect();
-                DataOutputStream out=new DataOutputStream(conn.getOutputStream());
-
-                List<Pair> formParams=new ArrayList<Pair>();
-                formParams.add(new Pair("subCmd", "Login"));
-                formParams.add(new Pair("txt_LoginID", "201100800169"));
-                formParams.add(new Pair("txt_Password", "011796"));
-                formParams.add(new Pair("selSchool", "15"));
-                formParams.add(new Pair("__EVENTVALIDATION", loginXmlPullParser.event_validation));
-                formParams.add(new Pair("__VIEWSTATE", loginXmlPullParser.view_state));
-                out.writeUTF(genForm(formParams));
-                out.flush();
-                out.close();
-                conn.disconnect();
-
-                //get floor info
-                url=new URL("http://yuyue.juneberry.cn/ReadingRoomInfos/ReadingRoomState.aspx");
-                conn=(HttpURLConnection)url.openConnection();
-                conn.setReadTimeout(10000);
-                conn.setConnectTimeout(10000);
-                conn.setRequestMethod("GET");
-                conn.setDoInput(true);
-                conn.connect();
-                is=conn.getInputStream();
-
-                Reader reader = null;
-                reader = new InputStreamReader(is, "UTF-8");
-                char[] buffer = new char[10000];
-                reader.read(buffer);
-                result=new String(buffer);
-                //FloorInfoXmlPullParser floorInfoXmlPullParser=new FloorInfoXmlPullParser();
-                //floorInfoXmlPullParser.parse(is,new String[]{"html","body","form","div","div"},"ul");
+                getLoginParams();
+                result=Login();
             }catch(Exception e){
                 e.printStackTrace();
             }
             return result;
         }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            mContentText.setText("");
+        }
+    }
+
+    public void getLoginParams() throws Exception{
+        URL url = new URL(root_url);
+        HttpURLConnection conn=(HttpURLConnection)url.openConnection();
+        conn.setReadTimeout(10000);
+        conn.setConnectTimeout(10000);
+        conn.setRequestMethod("GET");
+        conn.setDoInput(true);
+        conn.connect();
+        InputStream is=conn.getInputStream();
+        LoginParamsXmlPullParser loginXmlPullParser =new LoginParamsXmlPullParser();
+        loginXmlPullParser.parse(is, new String[]{"html", "body", "form"}, "input");
+        is.close();
+        conn.disconnect();
+    }
+
+    public String Login() throws Exception{
+        URL url = new URL(root_url+"/Login.aspx");
+        loginCookieManager=new CookieManager();
+        CookieHandler.setDefault(loginCookieManager);
+        HttpURLConnection conn=(HttpURLConnection)url.openConnection();
+        conn.setReadTimeout(10000);
+        conn.setConnectTimeout(10000);
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        //conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        conn.setRequestProperty("Charset", "UTF-8");
+        conn.connect();
+        OutputStream out=conn.getOutputStream();
+
+        List<Pair> formParams=new ArrayList<Pair>();
+        formParams.add(new Pair("__VIEWSTATE", view_state));
+        formParams.add(new Pair("__EVENTVALIDATION", event_validation));
+        formParams.add(new Pair("subCmd", "Login"));
+        formParams.add(new Pair("txt_LoginID", "201100800169"));
+        formParams.add(new Pair("txt_Password", "011796"));
+        formParams.add(new Pair("selSchool", "15"));
+        String final_params=getFormParams(formParams).toString();
+        out.write(final_params.getBytes());
+        out.flush();
+        out.close();
+
+        //String cookie=conn.getHeaderField("Set-Cookie");
+
+        Map<String, List<String>> headerFields=conn.getHeaderFields();
+        List<String> cookiesHeader=headerFields.get("Set-Cookie");
+        if(cookiesHeader!=null){
+            for(String cookie:cookiesHeader){
+                HttpCookie var=HttpCookie.parse(cookie).get(0);
+                loginCookieManager.getCookieStore().add(new URI(root_url), var);
+            }
+        }
+        InputStream is=conn.getInputStream();
+        String result=getFullStringFromConnection(is, "UTF-8");
+        is.close();
+        conn.disconnect();
+        return result;
+    }
+
+    public String getFloorInfo () throws Exception {
+        //get floor info
+        URL url=new URL(root_url+"/ReadingRoomInfos/ReadingRoomState.aspx");
+        HttpURLConnection conn=(HttpURLConnection)url.openConnection();
+        conn.setReadTimeout(10000);
+        conn.setConnectTimeout(10000);
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Cookie", TextUtils.join(";",loginCookieManager.getCookieStore().get(new URI(root_url))));
+        conn.setDoInput(true);
+        conn.connect();
+        InputStream is=conn.getInputStream();
+        String result=getFullStringFromConnection(is, "UTF-8");
+        is.close();
+        conn.disconnect();
+        return result;
+    }
+
+    public String getFullStringFromConnection(InputStream is,String format) throws IOException{
+        BufferedReader buff = new BufferedReader(new InputStreamReader(is, format));
+        StringBuffer resultBuff=new StringBuffer();
+        String line="";
+        while((line=buff.readLine())!=null){
+            resultBuff.append(line);
+        }
+        return resultBuff.toString();
+    }
+
+    public String getFormParams(List<Pair> orig_params){
+        List<String> cooked_params=new ArrayList<>();
+        for(Pair pair:orig_params){
+            cooked_params.add(pair.first + "=" + pair.second);
+        }
+        return TextUtils.join("&",cooked_params);
     }
 
     public static String genForm(List<Pair> data){
@@ -127,9 +185,7 @@ public class MainActivity extends AppCompatActivity {
         return result;
     }
 
-    private class LoginXmlPullParser {
-        public String event_validation="";
-        public String view_state="";
+    private class LoginParamsXmlPullParser {
         private final String ns = null;
         private String path[];
         private String elementEntry;
