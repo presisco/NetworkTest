@@ -10,6 +10,7 @@ import android.view.View;
 import android.webkit.WebView;
 import android.widget.TextView;
 
+import org.w3c.dom.Entity;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -25,6 +26,7 @@ import java.net.HttpCookie;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,8 @@ public class MainActivity extends AppCompatActivity {
 
     public String event_validation="";
     public String view_state="";
+
+    Map<String,List<String>> conn_infos;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,7 +69,8 @@ public class MainActivity extends AppCompatActivity {
             String result="";
             try {
                 getLoginParams();
-                result=Login();
+                Login();
+                result=getFloorInfo();
             }catch(Exception e){
                 e.printStackTrace();
             }
@@ -104,7 +109,8 @@ public class MainActivity extends AppCompatActivity {
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
         //conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        conn.setRequestProperty("Charset", "UTF-8");
+        //conn.setRequestProperty("Charset", "UTF-8");
+        conn.setUseCaches(false);
         conn.connect();
         OutputStream out=conn.getOutputStream();
 
@@ -112,8 +118,8 @@ public class MainActivity extends AppCompatActivity {
         formParams.add(new Pair("__VIEWSTATE", view_state));
         formParams.add(new Pair("__EVENTVALIDATION", event_validation));
         formParams.add(new Pair("subCmd", "Login"));
-        formParams.add(new Pair("txt_LoginID", "201100800169"));
-        formParams.add(new Pair("txt_Password", "011796"));
+        formParams.add(new Pair("txt_LoginID", "201200620807"));
+        formParams.add(new Pair("txt_Password", "201200620807"));
         formParams.add(new Pair("selSchool", "15"));
         String final_params=getFormParams(formParams).toString();
         out.write(final_params.getBytes());
@@ -121,15 +127,17 @@ public class MainActivity extends AppCompatActivity {
         out.close();
 
         //String cookie=conn.getHeaderField("Set-Cookie");
+//        Map<String, List<String>> headerFields=conn.getHeaderFields();
+//        List<String> cookiesHeader=headerFields.get("Set-Cookie");
+//        if(cookiesHeader!=null){
+//            for(String cookie:cookiesHeader){
+//                HttpCookie var=HttpCookie.parse(cookie).get(0);
+//                loginCookieManager.getCookieStore().add(new URI(root_url), var);
+//            }
+//        }
 
-        Map<String, List<String>> headerFields=conn.getHeaderFields();
-        List<String> cookiesHeader=headerFields.get("Set-Cookie");
-        if(cookiesHeader!=null){
-            for(String cookie:cookiesHeader){
-                HttpCookie var=HttpCookie.parse(cookie).get(0);
-                loginCookieManager.getCookieStore().add(new URI(root_url), var);
-            }
-        }
+        conn_infos=conn.getHeaderFields();
+
         InputStream is=conn.getInputStream();
         String result=getFullStringFromConnection(is, "UTF-8");
         is.close();
@@ -144,7 +152,10 @@ public class MainActivity extends AppCompatActivity {
         conn.setReadTimeout(10000);
         conn.setConnectTimeout(10000);
         conn.setRequestMethod("GET");
-        conn.setRequestProperty("Cookie", TextUtils.join(";",loginCookieManager.getCookieStore().get(new URI(root_url))));
+        for(Map.Entry<String,List<String>> entry:conn_infos.entrySet()){
+            if(entry.getKey()!=null)
+                conn.setRequestProperty(entry.getKey(),TextUtils.join(";",entry.getValue()));
+        }
         conn.setDoInput(true);
         conn.connect();
         InputStream is=conn.getInputStream();
@@ -164,10 +175,10 @@ public class MainActivity extends AppCompatActivity {
         return resultBuff.toString();
     }
 
-    public String getFormParams(List<Pair> orig_params){
+    public String getFormParams (List<Pair> orig_params) throws Exception{
         List<String> cooked_params=new ArrayList<>();
         for(Pair pair:orig_params){
-            cooked_params.add(pair.first + "=" + pair.second);
+            cooked_params.add(pair.first + "=" + URLEncoder.encode((String)pair.second,"UTF-8"));
         }
         return TextUtils.join("&",cooked_params);
     }
